@@ -28,7 +28,6 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
             ghcr.io/${{ github.repository }}:${{ github.run_number }}
           images: ghcr.io/${{ github.repository }}
-          flavor: latest
 
       - name: Build and push Docker image to GHCR
         uses: docker/build-push-action@v5
