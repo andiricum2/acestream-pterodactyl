@@ -24,10 +24,7 @@ RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
     # Clean up APT caches
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --system --uid 1000 --gid 100 --shell /bin/bash --create-home --home-dir /home/container container \
-&& groupmod -g 1000 container \
-&& usermod -g 1000 container
-
+RUN useradd -m -d /home/container container
 
 ARG ACESTREAM_INSTALL_PATH="/home/container/${ACESTREAM_SUBDIR}"
 
