@@ -1,35 +1,32 @@
-name: GHCR to Docker Hub Sync on Release
+name: Docker Hub Release
 
 on:
   release:
     types: [created]
 
 jobs:
-  sync:
+  build_and_push:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login to GitHub Container Registry
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Extract metadata (tags, labels) for Docker build
         id: meta
         uses: docker/metadata-action@v5
         with:
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}:${{ github.run_number }}
-          images: ghcr.io/${{ github.repository }}
-
-      - name: Build and push Docker image to GHCR
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:${{ github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:${{ github.run_number }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -38,26 +35,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
       - name: Get the release version from the tag
         id: get_version
         run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         shell: bash
-      - name: Pull Image from GHCR
-        run: docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }}
-
-      - name: Tag Image for Docker Hub
-        run: |
-          docker tag ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }} ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:${{ steps.get_version.outputs.version }}
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push Image to Docker Hub
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:${{ steps.get_version.outputs.version }}
 
       - name: Generate release notes
         uses: actions/github-script@v7
@@ -68,24 +49,20 @@ jobs:
             const version = '${{ steps.get_version.outputs.version }}';
             const tag = 'refs/tags/' + version;
             const commit = github.context.sha;
-            const ghcrImageName = 'ghcr.io/${{ github.repository }}:' + version;
-            const dockerHubImageName = '${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:' + version;  // Use version tag
+            const dockerHubImageName = '${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository }}:' + version;
 
             const body = `
             ## Release Notes
 
-            This release contains the Docker images:
+            This release contains the Docker image:
 
-            - GitHub Container Registry (GHCR): ${ghcrImageName}
             - Docker Hub: ${dockerHubImageName}
 
-            - GHCR Image Tag: \`${ghcrImageName}\`
             - Docker Hub Image Tag: \`${dockerHubImageName}\`
             - Commit SHA: \`${commit}\`
             - Git Tag: \`${tag}\`
             `;
             core.setOutput('release_body', body);
-
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
